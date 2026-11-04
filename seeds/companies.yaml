@@ -1,0 +1,29 @@
+- ticker: "7974.T"
+  name: Nintendo Co., Ltd.
+  name_ja: 任天堂
+  exchange: TSE
+  currency: JPY
+
+- ticker: "6758.T"
+  name: Sony Group Corporation
+  name_ja: ソニーグループ
+  exchange: TSE
+  currency: JPY
+
+- ticker: "9468.T"
+  name: KADOKAWA Corporation
+  name_ja: KADOKAWA
+  exchange: TSE
+  currency: JPY
+
+- ticker: "9684.T"
+  name: Square Enix Holdings Co., Ltd.
+  name_ja: スクウェア・エニックス・ホールディングス
+  exchange: TSE
+  currency: JPY
+
+- ticker: "9697.T"
+  name: Capcom Co., Ltd.
+  name_ja: カプコン
+  exchange: TSE
+  currency: JPY
