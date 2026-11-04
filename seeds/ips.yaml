@@ -1,0 +1,269 @@
+# Hand-curated IP -> owner mappings for Phase 1.
+#
+# weight is a rough guess at how much of the IP's commercial upside flows to that company
+# (0-1). Co-productions, licensing, and anime production committees make this fuzzy; the
+# values below are documented assumptions, not facts.
+#
+# Nintendo first-party games are not sold on Steam and its anime presence is small, so
+# Nintendo IPs rely on social mentions only.
+
+# --- KADOKAWA (9468.T) -------------------------------------------------------
+- slug: elden-ring
+  name_en: Elden Ring
+  name_ja: エルデンリング
+  aliases: ["Elden Ring", "ELDEN RING", "Shadow of the Erdtree", "Nightreign"]
+  type: game
+  steam_appid: 1245620
+  owners:
+    - {ticker: "9468.T", role: developer, weight: 0.6, note: "FromSoftware is a KADOKAWA subsidiary; Bandai Namco publishes outside Japan"}
+
+- slug: armored-core-vi
+  name_en: Armored Core VI
+  name_ja: アーマード・コア6
+  aliases: ["Armored Core VI", "Armored Core 6", "AC6"]
+  type: game
+  steam_appid: 1888160
+  owners:
+    - {ticker: "9468.T", role: developer, weight: 0.6, note: "FromSoftware"}
+
+- slug: dark-souls-iii
+  name_en: Dark Souls III
+  name_ja: ダークソウル3
+  aliases: ["Dark Souls III", "Dark Souls 3", "DS3"]
+  type: game
+  steam_appid: 374320
+  owners:
+    - {ticker: "9468.T", role: developer, weight: 0.5, note: "FromSoftware; Bandai Namco publishes"}
+
+- slug: re-zero
+  name_en: "Re:Zero - Starting Life in Another World"
+  name_ja: Re:ゼロから始める異世界生活
+  aliases: ["Re:Zero", "Re Zero", "ReZero", "リゼロ"]
+  type: light_novel
+  mal_id: 31240
+  owners:
+    - {ticker: "9468.T", role: publisher, weight: 0.7, note: "MF Bunko J light novel"}
+
+- slug: konosuba
+  name_en: KonoSuba
+  name_ja: この素晴らしい世界に祝福を!
+  aliases: ["KonoSuba", "Konosuba", "このすば"]
+  type: light_novel
+  mal_id: 30831
+  owners:
+    - {ticker: "9468.T", role: publisher, weight: 0.7, note: "Kadokawa Sneaker Bunko"}
+
+- slug: overlord
+  name_en: Overlord
+  name_ja: オーバーロード
+  aliases: ["Overlord", "Ainz Ooal Gown"]
+  type: light_novel
+  mal_id: 29803
+  owners:
+    - {ticker: "9468.T", role: publisher, weight: 0.7, note: "Enterbrain / KADOKAWA"}
+
+- slug: mushoku-tensei
+  name_en: Mushoku Tensei
+  name_ja: 無職転生
+  aliases: ["Mushoku Tensei", "Jobless Reincarnation", "無職転生"]
+  type: light_novel
+  mal_id: 39535
+  owners:
+    - {ticker: "9468.T", role: publisher, weight: 0.6, note: "MF Books"}
+
+# --- Capcom (9697.T) ---------------------------------------------------------
+- slug: monster-hunter-wilds
+  name_en: Monster Hunter Wilds
+  name_ja: モンスターハンターワイルズ
+  aliases: ["Monster Hunter Wilds", "MH Wilds", "MHWilds", "モンハンワイルズ"]
+  type: game
+  steam_appid: 2246340
+  owners:
+    - {ticker: "9697.T", role: publisher, weight: 1.0}
+
+- slug: monster-hunter-world
+  name_en: "Monster Hunter: World"
+  name_ja: モンスターハンター:ワールド
+  aliases: ["Monster Hunter World", "MHW", "Iceborne"]
+  type: game
+  steam_appid: 582010
+  owners:
+    - {ticker: "9697.T", role: publisher, weight: 1.0}
+
+- slug: street-fighter-6
+  name_en: Street Fighter 6
+  name_ja: ストリートファイター6
+  aliases: ["Street Fighter 6", "SF6", "スト6"]
+  type: game
+  steam_appid: 1364780
+  owners:
+    - {ticker: "9697.T", role: publisher, weight: 1.0}
+
+- slug: resident-evil-4
+  name_en: Resident Evil 4 (2023)
+  name_ja: バイオハザード RE:4
+  aliases: ["Resident Evil 4", "RE4", "RE4 Remake", "バイオRE4"]
+  type: game
+  steam_appid: 2050650
+  owners:
+    - {ticker: "9697.T", role: publisher, weight: 1.0}
+
+- slug: dragons-dogma-2
+  name_en: "Dragon's Dogma 2"
+  name_ja: ドラゴンズドグマ2
+  aliases: ["Dragon's Dogma 2", "Dragons Dogma 2", "DD2"]
+  type: game
+  steam_appid: 2054970
+  owners:
+    - {ticker: "9697.T", role: publisher, weight: 1.0}
+
+# --- Square Enix (9684.T) ----------------------------------------------------
+- slug: final-fantasy-xiv
+  name_en: Final Fantasy XIV Online
+  name_ja: ファイナルファンタジーXIV
+  aliases: ["Final Fantasy XIV", "FFXIV", "FF14", "Dawntrail"]
+  type: game
+  steam_appid: 39210
+  owners:
+    - {ticker: "9684.T", role: publisher, weight: 1.0}
+
+- slug: final-fantasy-vii-rebirth
+  name_en: Final Fantasy VII Rebirth
+  name_ja: ファイナルファンタジーVII リバース
+  aliases: ["Final Fantasy VII Rebirth", "FF7 Rebirth", "FFVII Rebirth"]
+  type: game
+  steam_appid: 2909400
+  owners:
+    - {ticker: "9684.T", role: publisher, weight: 1.0}
+
+- slug: nier-automata
+  name_en: "NieR:Automata"
+  name_ja: ニーア オートマタ
+  aliases: ["NieR Automata", "Nier: Automata", "NieR:Automata"]
+  type: game
+  steam_appid: 524220
+  owners:
+    - {ticker: "9684.T", role: publisher, weight: 1.0}
+
+- slug: dragon-quest-xi
+  name_en: "Dragon Quest XI S"
+  name_ja: ドラゴンクエストXI
+  aliases: ["Dragon Quest XI", "DQXI", "DQ11", "ドラクエ11"]
+  type: game
+  steam_appid: 1295510
+  owners:
+    - {ticker: "9684.T", role: publisher, weight: 1.0}
+
+- slug: fullmetal-alchemist
+  name_en: "Fullmetal Alchemist: Brotherhood"
+  name_ja: 鋼の錬金術師
+  aliases: ["Fullmetal Alchemist", "FMAB", "FMA Brotherhood", "鋼の錬金術師"]
+  type: manga
+  mal_id: 5114
+  owners:
+    - {ticker: "9684.T", role: publisher, weight: 0.5, note: "Monthly Shonen Gangan manga; anime is an Aniplex/committee production"}
+    - {ticker: "6758.T", role: licensor, weight: 0.3, note: "Aniplex (Sony Music) produced the anime"}
+
+# --- Sony Group (6758.T) -----------------------------------------------------
+- slug: helldivers-2
+  name_en: Helldivers 2
+  aliases: ["Helldivers 2", "Helldivers II"]
+  type: game
+  steam_appid: 553850
+  owners:
+    - {ticker: "6758.T", role: publisher, weight: 1.0, note: "PlayStation Publishing; Arrowhead develops"}
+
+- slug: god-of-war
+  name_en: God of War
+  aliases: ["God of War", "Kratos", "GoW Ragnarok"]
+  type: game
+  steam_appid: 1593500
+  owners:
+    - {ticker: "6758.T", role: publisher, weight: 1.0}
+
+- slug: ghost-of-tsushima
+  name_en: Ghost of Tsushima
+  name_ja: ゴースト・オブ・ツシマ
+  aliases: ["Ghost of Tsushima", "Ghost of Yotei", "Ghost of Yōtei"]
+  type: game
+  steam_appid: 2215430
+  owners:
+    - {ticker: "6758.T", role: publisher, weight: 1.0}
+
+- slug: spider-man-remastered
+  name_en: "Marvel's Spider-Man Remastered"
+  aliases: ["Marvel's Spider-Man", "Spider-Man Remastered", "Spider-Man 2"]
+  type: game
+  steam_appid: 1817070
+  owners:
+    - {ticker: "6758.T", role: publisher, weight: 0.8, note: "Marvel license"}
+
+- slug: demon-slayer
+  name_en: Demon Slayer
+  name_ja: 鬼滅の刃
+  aliases: ["Demon Slayer", "Kimetsu no Yaiba", "鬼滅の刃", "Infinity Castle"]
+  type: anime
+  mal_id: 38000
+  owners:
+    - {ticker: "6758.T", role: licensor, weight: 0.4, note: "Aniplex co-produces; Shueisha (private) owns the manga"}
+
+- slug: solo-leveling
+  name_en: Solo Leveling
+  name_ja: 俺だけレベルアップな件
+  aliases: ["Solo Leveling", "Ore dake Level Up na Ken", "俺レベ"]
+  type: anime
+  mal_id: 52299
+  owners:
+    - {ticker: "6758.T", role: licensor, weight: 0.4, note: "Aniplex / A-1 Pictures anime, Crunchyroll distribution"}
+
+- slug: sword-art-online
+  name_en: Sword Art Online
+  name_ja: ソードアート・オンライン
+  aliases: ["Sword Art Online", "SAO", "ソードアート・オンライン"]
+  type: light_novel
+  mal_id: 11757
+  owners:
+    - {ticker: "9468.T", role: publisher, weight: 0.4, note: "Dengeki Bunko light novel"}
+    - {ticker: "6758.T", role: licensor, weight: 0.4, note: "Aniplex anime"}
+
+# --- Nintendo (7974.T) -------------------------------------------------------
+- slug: pokemon
+  name_en: Pokémon
+  name_ja: ポケットモンスター
+  aliases: ["Pokemon", "Pokémon", "ポケモン", "Pokemon Legends"]
+  type: franchise
+  mal_id: 527
+  owners:
+    - {ticker: "7974.T", role: parent, weight: 0.3, note: "Nintendo holds about a third of The Pokémon Company"}
+
+- slug: super-mario
+  name_en: Super Mario
+  name_ja: スーパーマリオ
+  aliases: ["Super Mario", "Mario Kart", "Mario Party", "マリオ"]
+  type: franchise
+  owners:
+    - {ticker: "7974.T", role: publisher, weight: 1.0}
+
+- slug: zelda
+  name_en: The Legend of Zelda
+  name_ja: ゼルダの伝説
+  aliases: ["Zelda", "Tears of the Kingdom", "Breath of the Wild", "ゼルダ"]
+  type: franchise
+  owners:
+    - {ticker: "7974.T", role: publisher, weight: 1.0}
+
+- slug: animal-crossing
+  name_en: Animal Crossing
+  name_ja: どうぶつの森
+  aliases: ["Animal Crossing", "どうぶつの森", "あつ森"]
+  type: franchise
+  owners:
+    - {ticker: "7974.T", role: publisher, weight: 1.0}
+
+- slug: splatoon
+  name_en: Splatoon
+  name_ja: スプラトゥーン
+  aliases: ["Splatoon", "スプラトゥーン", "スプラ3"]
+  type: franchise
+  owners:
+    - {ticker: "7974.T", role: publisher, weight: 1.0}
