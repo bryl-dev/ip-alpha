@@ -1,0 +1,55 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ipalpha
+      POSTGRES_PASSWORD: ipalpha
+      POSTGRES_DB: ipalpha
+    ports: ["5433:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ipalpha"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6380:6379"]
+
+  api:
+    build: ./backend
+    env_file: [{path: .env, required: false}]
+    environment:
+      DATABASE_URL: postgresql+psycopg://ipalpha:ipalpha@db:5432/ipalpha
+      SEEDS_DIR: /seeds
+    volumes: [./seeds:/seeds:ro]
+    command: >
+      sh -c "alembic upgrade head && ipalpha seed &&
+             uvicorn ipalpha.api.main:app --host 0.0.0.0 --port 8000"
+    ports: ["8000:8000"]
+    depends_on:
+      db: {condition: service_healthy}
+
+  worker:
+    build: ./backend
+    env_file: [{path: .env, required: false}]
+    environment:
+      DATABASE_URL: postgresql+psycopg://ipalpha:ipalpha@db:5432/ipalpha
+      SEEDS_DIR: /seeds
+    volumes: [./seeds:/seeds:ro]
+    command: ipalpha worker
+    depends_on:
+      api: {condition: service_started}
+
+  web:
+    build:
+      context: ./web
+      args:
+        API_URL: http://api:8000
+    environment:
+      API_URL: http://api:8000
+    ports: ["3000:3000"]
+    depends_on: [api]
+
+volumes:
+  pgdata:
