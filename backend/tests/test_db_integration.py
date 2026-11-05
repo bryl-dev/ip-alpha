@@ -4,21 +4,30 @@ Skipped when TEST_DATABASE_URL's server is unreachable.
 """
 
 import datetime as dt
+import json
 import os
+import re
+from contextlib import nullcontext
 
 import numpy as np
 import pytest
 from alembic import command
 from alembic.config import Config
+from fakes import FakeLLM
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, func, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
+from ipalpha.agents.analyst import Evidence, ThesisDraft
+from ipalpha.agents.mapper import Disambiguation
+from ipalpha.agents.normalize import PostAnalysis, TranslatedPost
+from ipalpha.agents.pipeline_graph import run_pipeline
 from ipalpha.api.main import app
-from ipalpha.config import REPO_ROOT
-from ipalpha.db.models import HypeScore, Ip, Metric, StockPrice
+from ipalpha.api.routers import chat as chat_router
+from ipalpha.config import REPO_ROOT, get_settings
+from ipalpha.db.models import Document, HypeScore, Ip, IpCandidate, Metric, StockPrice, Thesis
 from ipalpha.db.session import get_db
 from ipalpha.scoring import job as scoring_job
 from ipalpha.seed import apply_seeds
@@ -122,5 +131,132 @@ def test_api_serves_scored_company(session: Session):
         assert series[-1]["close"] is not None and series[-1]["divergence"] is not None
 
         assert client.get("/companies/NOPE").status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+
+
+def _fake_llm() -> FakeLLM:
+    def analyze(messages):
+        post = messages[-1]["content"]
+        mentions = [m for m in ("Erden Ring", "Totally Unknown Game") if m in post]
+        fields = dict(ip_mentions=mentions, event_type="dlc_or_update", sentiment=0.8, summary=post)
+        if "translate" in post.lower():
+            return TranslatedPost(**fields, text_en=f"(en) {post.splitlines()[-1]}")
+        return PostAnalysis(**fields)
+
+    def disambiguate(messages):
+        typo = '"Erden Ring"' in messages[-1]["content"]
+        return Disambiguation(reading="", reason="", choice=1 if typo else 0)
+
+    def thesis(messages):
+        first = int(re.search(r"^\[(\d+)\]", messages[-1]["content"], re.M).group(1))
+        return ThesisDraft(
+            headline="DLC news drives hype",
+            stance="hype_ahead_of_price",
+            claim="Players returned for the DLC.",
+            evidence=[
+                Evidence(document_id=first, point="DLC post"),
+                Evidence(document_id=999999, point="x"),
+            ],
+            risks=["Short-lived spike"],
+            confidence=0.5,
+        )
+
+    def reply(messages):
+        first = re.search(r"^\[(\d+)\]", messages[-1]["content"], re.M).group(1)
+        return f"Hype is up on DLC news [{first}], unlike [424242]."
+
+    return FakeLLM(
+        {
+            PostAnalysis: analyze,
+            TranslatedPost: analyze,
+            Disambiguation: disambiguate,
+            ThesisDraft: thesis,
+        },
+        reply=reply,
+    )
+
+
+def test_agent_pipeline_and_chat(session: Session, monkeypatch):
+    elden = session.scalars(select(Ip).where(Ip.slug == "elden-ring")).one()
+    when = dt.datetime(2026, 10, 30, 3, tzinfo=dt.UTC)
+    session.add_all(
+        [
+            Document(
+                source="reddit",
+                external_id="reddit:a",
+                text_original="Erden Ring DLC trailer is out and it looks great",
+                published_at=when,
+            ),
+            Document(
+                source="bluesky",
+                external_id="bluesky:b",
+                text_original="新作「Totally Unknown Game」が発表された",
+                published_at=when,
+            ),
+            Document(
+                source="reddit",
+                external_id="reddit:c:elden-ring",
+                ip_id=elden.id,
+                text_original="Shadow of the Erdtree tops the charts",
+                published_at=when,
+            ),
+        ]
+    )
+    session.commit()
+
+    llm = _fake_llm()
+    settings = get_settings().model_copy(
+        update={"mapper_accept_similarity": 0.99, "mapper_review_similarity": 0.3}
+    )
+    state = run_pipeline(
+        ["normalize", "map_ip", "embed", "score", "analyze"],
+        llm=llm,
+        settings=settings,
+        session_factory=lambda: nullcontext(session),
+        tickers=["9468.T"],
+        force_analyze=True,
+    )
+    assert state["errors"] == []
+    assert state["results"]["normalize"]["texts"] == 3
+
+    docs = {d.external_id: d for d in session.scalars(select(Document))}
+    typo, unknown = docs["reddit:a"], docs["bluesky:b"]
+    assert (typo.ip_id, typo.mapping) == (elden.id, "llm")
+    assert unknown.lang == "ja" and unknown.text_en.startswith("(en)")
+    assert unknown.ip_id is None and unknown.mapping == "unknown"
+    assert all(d.embedding is not None for d in docs.values())
+    candidate = session.scalars(select(IpCandidate)).one()
+    assert candidate.name == "Totally Unknown Game"
+
+    thesis = session.scalars(select(Thesis).where(Thesis.ticker == "9468.T")).one()
+    assert len(thesis.body["evidence"]) == 1 and thesis.body["dropped_citations"] == [999999]
+    assert thesis.body["disclaimer"]
+
+    monkeypatch.setattr(chat_router, "get_llm", lambda: llm)
+    monkeypatch.setattr(chat_router, "session_scope", lambda: nullcontext(session))
+    app.dependency_overrides[get_db] = lambda: session
+    try:
+        client = TestClient(app)
+        resp = client.post("/chat", json={"message": "Why is Kadokawa up today?"})
+        assert resp.headers["content-type"].startswith("text/event-stream")
+        events = [
+            json.loads(line[len("data: ") :])
+            for line in resp.text.splitlines()
+            if line.startswith("data: ")
+        ]
+        types = [e["type"] for e in events]
+        assert types[:2] == ["status", "sources"] and types[-2:] == ["citations", "done"]
+        assert "9468.T" in events[0]["text"]
+        source_ids = {s["id"] for s in events[1]["sources"]}
+        assert typo.id in source_ids
+        answer = "".join(e["text"] for e in events if e["type"] == "token")
+        assert answer.startswith("Hype is up on DLC news")
+        assert events[-2]["invalid"] == [424242] and len(events[-2]["valid"]) == 1
+
+        theses = client.get("/companies/9468.T/theses").json()
+        assert theses[0]["body"]["headline"] == "DLC news drives hype"
+        names = [c["name"] for c in client.get("/review/ip-candidates").json()]
+        assert names == ["Totally Unknown Game"]
     finally:
         app.dependency_overrides.clear()

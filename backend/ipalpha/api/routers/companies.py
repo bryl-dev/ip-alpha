@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from ipalpha.api.schemas import CompanyDetail, CompanySummary, IpSummary, SeriesPoint
-from ipalpha.db.models import Company, HypeScore, IpOwnership, StockPrice
+from ipalpha.api.schemas import CompanyDetail, CompanySummary, IpSummary, SeriesPoint, ThesisOut
+from ipalpha.db.models import Company, HypeScore, IpOwnership, StockPrice, Thesis
 from ipalpha.db.session import get_db
 
 router = APIRouter(prefix="/companies", tags=["companies"])
@@ -125,3 +125,18 @@ def company_series(
         p = points.setdefault(h.date, SeriesPoint(date=h.date))
         p.hype, p.divergence = h.score, h.divergence
     return [points[d] for d in sorted(points)]
+
+
+@router.get("/{ticker}/theses", response_model=list[ThesisOut])
+def company_theses(
+    ticker: str, limit: int = Query(5, ge=1, le=50), db: Session = Depends(get_db)
+) -> list[Thesis]:
+    _get_company(db, ticker)
+    return list(
+        db.scalars(
+            select(Thesis)
+            .where(Thesis.ticker == ticker)
+            .order_by(Thesis.date.desc(), Thesis.created_at.desc())
+            .limit(limit)
+        )
+    )
