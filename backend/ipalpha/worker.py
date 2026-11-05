@@ -21,6 +21,15 @@ def build_scheduler() -> BlockingScheduler:
         max_instances=1,
         coalesce=True,
     )
+    # The LLM works through new posts in batches, so enrichment runs hourly to drain the queue.
+    scheduler.add_job(
+        run_job,
+        CronTrigger(minute=30, timezone=TZ),
+        args=["enrich"],
+        id="enrich",
+        max_instances=1,
+        coalesce=True,
+    )
     # TSE closes at 15:30 JST; pull prices after that and everything else in the early morning.
     daily = {
         "steam": "6:10",
@@ -30,6 +39,7 @@ def build_scheduler() -> BlockingScheduler:
         "bluesky": "6:50",
         "prices": "16:30",
         "score": "17:00",
+        "analyze": "17:15",
     }
     for job, at in daily.items():
         hour, minute = map(int, at.split(":"))
