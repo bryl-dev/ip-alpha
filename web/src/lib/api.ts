@@ -35,6 +35,44 @@ export type SeriesPoint = {
   divergence: number | null;
 };
 
+export type ThesisEvidence = {
+  document_id: number;
+  point: string;
+  source: string;
+  url: string | null;
+  published_at: string;
+};
+
+export type Thesis = {
+  id: number;
+  ticker: string;
+  date: string;
+  divergence: number | null;
+  model: string;
+  created_at: string;
+  body: {
+    headline: string;
+    stance: "hype_ahead_of_price" | "price_ahead_of_hype" | "no_clear_signal";
+    claim: string;
+    evidence: ThesisEvidence[];
+    risks: string[];
+    confidence: number;
+    disclaimer: string;
+  };
+};
+
+export type ChatSource = {
+  id: number;
+  source: string;
+  url: string | null;
+  published_at: string;
+  ip_name: string | null;
+  text: string;
+  summary: string | null;
+  sentiment: number | null;
+  event_type: string | null;
+};
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -57,3 +95,6 @@ export const getCompany = (ticker: string) =>
 
 export const getCompanySeries = (ticker: string) =>
   get<SeriesPoint[]>(`/companies/${encodeURIComponent(ticker)}/series`);
+
+export const getCompanyTheses = (ticker: string, limit = 1) =>
+  get<Thesis[]>(`/companies/${encodeURIComponent(ticker)}/theses?limit=${limit}`);
