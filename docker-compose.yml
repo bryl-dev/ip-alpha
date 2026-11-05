@@ -24,6 +24,7 @@ services:
       DATABASE_URL: postgresql+psycopg://ipalpha:ipalpha@db:5432/ipalpha
       SEEDS_DIR: /seeds
       LLM_BASE_URL: http://host.docker.internal:11434/v1
+      REDIS_URL: redis://redis:6379/0
     extra_hosts: ["host.docker.internal:host-gateway"]
     volumes: [./seeds:/seeds:ro]
     command: >
@@ -32,6 +33,7 @@ services:
     ports: ["8000:8000"]
     depends_on:
       db: {condition: service_healthy}
+      redis: {condition: service_started}
 
   worker:
     build: ./backend
@@ -40,11 +42,13 @@ services:
       DATABASE_URL: postgresql+psycopg://ipalpha:ipalpha@db:5432/ipalpha
       SEEDS_DIR: /seeds
       LLM_BASE_URL: http://host.docker.internal:11434/v1
+      REDIS_URL: redis://redis:6379/0
     extra_hosts: ["host.docker.internal:host-gateway"]
     volumes: [./seeds:/seeds:ro]
     command: ipalpha worker
     depends_on:
       api: {condition: service_started}
+      redis: {condition: service_started}
 
   web:
     build:

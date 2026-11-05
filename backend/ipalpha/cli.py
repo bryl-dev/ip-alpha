@@ -1,5 +1,4 @@
 import argparse
-import logging
 import sys
 
 import truststore
@@ -7,6 +6,7 @@ import truststore
 from ipalpha.config import get_settings
 from ipalpha.db.session import session_scope
 from ipalpha.jobs import DAILY_INGEST, JOBS, run_job
+from ipalpha.observability import setup_observability
 from ipalpha.seed import apply_seeds
 
 
@@ -35,10 +35,7 @@ def _chat(question: str) -> None:
 def main() -> None:
     # Use the OS certificate store so TLS works behind proxies that install their own root CA.
     truststore.inject_into_ssl()
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
-    )
-    logging.getLogger("httpx").setLevel(logging.WARNING)
+    setup_observability("cli")
     parser = argparse.ArgumentParser(prog="ipalpha")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("seed", help="load seeds/*.yaml into the database")
