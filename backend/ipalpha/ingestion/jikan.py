@@ -2,7 +2,6 @@
 (unofficial; limits: 3 requests/second, 60/minute)."""
 
 import logging
-import time
 from typing import Any
 
 import httpx
@@ -18,14 +17,14 @@ from ipalpha.ingestion.common import (
     upsert_metrics,
     utcnow,
 )
+from ipalpha.ingestion.http import get_json
 
 log = logging.getLogger(__name__)
 
 SOURCE = "mal"
 JIKAN_URL = "https://api.jikan.moe/v4/anime/{mal_id}"
 MAL_URL = "https://api.myanimelist.net/v2/anime/{mal_id}"
-REQUEST_INTERVAL_S = 1.1
-RETRY_AFTER_429_S = 5.0
+CACHE_TTL_S = 3600
 
 
 def parse_anime(payload: dict[str, Any]) -> dict[str, float]:
@@ -51,24 +50,20 @@ def parse_mal_official(payload: dict[str, Any]) -> dict[str, float]:
 
 
 def fetch_anime(client: httpx.Client, mal_id: int) -> dict[str, Any]:
-    for attempt in range(3):
-        resp = client.get(JIKAN_URL.format(mal_id=mal_id))
-        if resp.status_code == 429 and attempt < 2:
-            time.sleep(RETRY_AFTER_429_S * (attempt + 1))
-            continue
-        resp.raise_for_status()
-        return resp.json()
-    raise AssertionError("unreachable")
+    return get_json(
+        client, JIKAN_URL.format(mal_id=mal_id), source="jikan", cache_ttl_s=CACHE_TTL_S
+    )
 
 
 def fetch_mal_official(client: httpx.Client, mal_id: int, client_id: str) -> dict[str, Any]:
-    resp = client.get(
+    return get_json(
+        client,
         MAL_URL.format(mal_id=mal_id),
+        source="mal_api",
         params={"fields": "mean,num_list_users"},
         headers={"X-MAL-CLIENT-ID": client_id},
+        cache_ttl_s=CACHE_TTL_S,
     )
-    resp.raise_for_status()
-    return resp.json()
 
 
 def run(session: Session, client: httpx.Client | None = None) -> int:
@@ -101,5 +96,4 @@ def run(session: Session, client: httpx.Client | None = None) -> int:
                 break
             except (httpx.HTTPError, KeyError, ValueError) as exc:
                 log.warning("%s fetch failed for %s (%s): %s", provider, ip.slug, ip.mal_id, exc)
-            time.sleep(REQUEST_INTERVAL_S)
     return upsert_metrics(session, points)

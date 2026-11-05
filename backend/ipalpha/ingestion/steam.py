@@ -3,7 +3,6 @@ SteamSpy as a fallback for review counts (the store's appreviews endpoint redire
 homepage from some networks)."""
 
 import logging
-import time
 from typing import Any
 
 import httpx
@@ -18,6 +17,7 @@ from ipalpha.ingestion.common import (
     upsert_metrics,
     utcnow,
 )
+from ipalpha.ingestion.http import get_json
 
 log = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ SOURCE = "steam"
 CCU_URL = "https://api.steampowered.com/ISteamUserStats/GetNumberOfCurrentPlayers/v1/"
 REVIEWS_URL = "https://store.steampowered.com/appreviews/{appid}"
 STEAMSPY_URL = "https://steamspy.com/api.php"
-REQUEST_INTERVAL_S = 1.0
+REVIEWS_CACHE_TTL_S = 3600
 
 
 def parse_ccu(payload: dict[str, Any]) -> int | None:
@@ -56,26 +56,45 @@ def parse_steamspy(payload: dict[str, Any]) -> dict[str, float] | None:
     return _review_metrics(positive + negative, positive)
 
 
-def _get_json(client: httpx.Client, url: str, params: dict[str, Any]) -> dict[str, Any] | None:
-    resp = client.get(url, params=params)
-    resp.raise_for_status()
-    if "json" not in resp.headers.get("content-type", ""):
+def _get_json(
+    client: httpx.Client,
+    url: str,
+    params: dict[str, Any],
+    *,
+    source: str,
+    cache_ttl_s: int | None = None,
+) -> dict[str, Any] | None:
+    """None when the endpoint answers with something other than JSON, such as the store
+    homepage it redirects to from some networks."""
+    try:
+        return get_json(client, url, source=source, params=params, cache_ttl_s=cache_ttl_s)
+    except ValueError:
         return None
-    return resp.json()
 
 
 def fetch_ccu(client: httpx.Client, appid: int) -> dict[str, Any] | None:
-    return _get_json(client, CCU_URL, {"appid": appid})
+    return _get_json(client, CCU_URL, {"appid": appid}, source="steam")
 
 
 def fetch_review_summary(client: httpx.Client, appid: int) -> tuple[str, dict[str, float]] | None:
     """Returns (provider, metrics), trying the Steam store first and SteamSpy second."""
     params = {"json": 1, "language": "all", "purchase_type": "all", "num_per_page": 0}
-    payload = _get_json(client, REVIEWS_URL.format(appid=appid), params)
+    payload = _get_json(
+        client,
+        REVIEWS_URL.format(appid=appid),
+        params,
+        source="steam",
+        cache_ttl_s=REVIEWS_CACHE_TTL_S,
+    )
     if payload and (summary := parse_review_summary(payload)):
         return "steam_store", summary
-    time.sleep(REQUEST_INTERVAL_S)
-    payload = _get_json(client, STEAMSPY_URL, {"request": "appdetails", "appid": appid})
+    payload = _get_json(
+        client,
+        STEAMSPY_URL,
+        {"request": "appdetails", "appid": appid},
+        source="steamspy",
+        cache_ttl_s=REVIEWS_CACHE_TTL_S,
+    )
     if payload and (summary := parse_steamspy(payload)):
         return "steamspy", summary
     return None
@@ -101,7 +120,6 @@ def run(session: Session, include_reviews: bool = True, client: httpx.Client | N
                     points.append(MetricPoint(ip.id, SOURCE, "ccu", float(ccu), ts))
 
                 if include_reviews:
-                    time.sleep(REQUEST_INTERVAL_S)
                     if result := fetch_review_summary(http, appid):
                         provider, summary = result
                         store_raw_event(
@@ -120,5 +138,4 @@ def run(session: Session, include_reviews: bool = True, client: httpx.Client | N
                         log.warning("no review data for %s (%s)", ip.slug, appid)
             except (httpx.HTTPError, ValueError) as exc:
                 log.warning("steam fetch failed for %s (%s): %s", ip.slug, appid, exc)
-            time.sleep(REQUEST_INTERVAL_S)
     return upsert_metrics(session, points)

@@ -1,11 +1,12 @@
 import datetime as dt
 from pathlib import Path
+from types import SimpleNamespace
 
 import httpx
 import pytest
 import respx
 
-from ipalpha.ingestion import jikan, oricon, steam
+from ipalpha.ingestion import http, jikan, oricon, steam
 from ipalpha.ingestion.common import guess_lang
 from ipalpha.ingestion.matching import IpMatcher, IpRef
 
@@ -85,7 +86,7 @@ def test_mal_official_parser():
 
 @respx.mock
 def test_jikan_fetch_retries_on_429(monkeypatch):
-    monkeypatch.setattr(jikan.time, "sleep", lambda _s: None)
+    monkeypatch.setattr(http, "time", SimpleNamespace(sleep=lambda _s: None))
     route = respx.get("https://api.jikan.moe/v4/anime/31240").mock(
         side_effect=[
             httpx.Response(429),
