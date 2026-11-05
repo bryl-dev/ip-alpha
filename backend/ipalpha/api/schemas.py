@@ -1,6 +1,7 @@
 import datetime as dt
+from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CompanySummary(BaseModel):
@@ -59,6 +60,40 @@ class HypePoint(BaseModel):
     date: dt.date
     score: float
     components: dict[str, float]
+
+
+class ThesisOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    ticker: str
+    date: dt.date
+    divergence: float | None
+    body: dict[str, Any]
+    model: str
+    created_at: dt.datetime
+
+
+class IpCandidateOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    mention_count: int
+    example_document_id: int | None
+    status: str
+    first_seen: dt.datetime
+    last_seen: dt.datetime
+
+
+class ChatTurn(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(max_length=8000)
+
+
+class ChatRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=2000)
+    history: list[ChatTurn] = Field(default_factory=list, max_length=20)
 
 
 class IpDetail(BaseModel):
