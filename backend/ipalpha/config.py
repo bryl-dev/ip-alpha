@@ -50,6 +50,35 @@ class Settings(BaseSettings):
     mapper_review_similarity: float = 0.5
     analyst_min_divergence: float = 1.0
 
+    # Phase 3: infrastructure
+    redis_url: str = "redis://localhost:6380/0"
+    admin_token: str | None = None
+    # Phase 3: ingestion (requests per second, burst)
+    rate_limits: dict[str, tuple[float, int]] = {
+        "steam": (1.0, 1),
+        "steamspy": (1.0, 1),
+        "jikan": (1.0, 3),
+        "mal_api": (2.0, 2),
+        "bluesky": (2.0, 2),
+        "oricon": (0.2, 1),
+    }
+    http_cache_enabled: bool = True
+    http_max_retries: int = 4
+    # Phase 3: worker
+    job_timeout_s: int = 3600
+    # Phase 3: LLM resilience and cost accounting
+    llm_max_retries: int = 3
+    llm_price_in_per_mtok: float = 0.15
+    llm_price_out_per_mtok: float = 0.60
+    # Phase 3: observability
+    log_json: bool = False
+    log_level: str = "INFO"
+    langfuse_host: str | None = None
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: str | None = None
+    # Phase 3: deployment
+    chat_enabled: bool = True
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -25,6 +25,11 @@ dependencies = [
     "openai>=3.40",
     "langgraph>=1.2",
     "lingua-language-detector>=2.1",
+    "redis>=5.0",
+    "arq>=0.26",
+    "tenacity>=9.0",
+    "structlog>=24.1",
+    "langfuse>=2.50",
 ]
 
 [project.optional-dependencies]
@@ -34,6 +39,7 @@ dev = [
     "ruff>=0.5",
     "mypy>=1.10",
     "types-PyYAML",
+    "fakeredis[lua]>=2.23",
 ]
 
 [project.scripts]
@@ -54,7 +60,7 @@ target-version = "py312"
 select = ["E", "F", "I", "B", "UP", "SIM"]
 
 [tool.ruff.lint.flake8-bugbear]
-extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Header"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
