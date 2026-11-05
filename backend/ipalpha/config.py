@@ -36,6 +36,20 @@ class Settings(BaseSettings):
     benchmark_ticker: str = "^N225"
     price_history_days: int = 400
 
+    # Any OpenAI-compatible server works; the default is a local Ollama.
+    llm_base_url: str = "http://localhost:11434/v1"
+    llm_api_key: str = "ollama"
+    llm_model: str = "qwen2.5:7b"
+    embedding_model: str = "bge-m3"
+    llm_timeout_s: float = 180.0
+
+    normalize_batch_size: int = 100
+    # bge-m3 cosine similarity between a mention and an IP term: at or above `accept`, the
+    # match is taken as is; between `review` and `accept`, the LLM picks among candidates.
+    mapper_accept_similarity: float = 0.85
+    mapper_review_similarity: float = 0.5
+    analyst_min_divergence: float = 1.0
+
 
 @lru_cache
 def get_settings() -> Settings:
