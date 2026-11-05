@@ -21,11 +21,13 @@ from ipalpha.ingestion.common import (
     store_raw_event,
     upsert_metrics,
 )
+from ipalpha.ingestion.http import get_text
 from ipalpha.ingestion.matching import IpMatcher
 
 log = logging.getLogger(__name__)
 
 SOURCE = "oricon"
+CACHE_TTL_S = 21600
 _DATE_RANGE = re.compile(
     r"(\d{4})年(\d{1,2})月(\d{1,2})日\s*[~〜～]\s*(\d{4})年(\d{1,2})月(\d{1,2})日"
 )
@@ -102,9 +104,8 @@ def units_by_ip(ranking: Ranking, matcher: IpMatcher) -> dict[int, int]:
 def run(session: Session, client: httpx.Client | None = None) -> int:
     url = get_settings().oricon_ranking_url
     with client or http_client() as http:
-        resp = http.get(url)
-        resp.raise_for_status()
-    ranking = parse_ranking(resp.text)
+        html = get_text(http, url, source=SOURCE, cache_ttl_s=CACHE_TTL_S)
+    ranking = parse_ranking(html)
     store_raw_event(
         session,
         SOURCE,

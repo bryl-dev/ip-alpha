@@ -1,6 +1,5 @@
 import datetime as dt
 import logging
-import time
 
 from atproto import Client
 from sqlalchemy.orm import Session
@@ -8,12 +7,12 @@ from sqlalchemy.orm import Session
 from ipalpha.config import get_settings
 from ipalpha.ingestion.common import DocumentIn, insert_documents, utcnow
 from ipalpha.ingestion.matching import IpMatcher
+from ipalpha.ingestion.ratelimit import limiter
 from ipalpha.ingestion.social import documents_for_post
 
 log = logging.getLogger(__name__)
 
 SOURCE = "bluesky"
-REQUEST_INTERVAL_S = 1.0
 LOOKBACK = dt.timedelta(days=1)
 
 
@@ -34,6 +33,7 @@ def run(session: Session) -> int:
 
     docs: list[DocumentIn] = []
     for ip in matcher.ips:
+        limiter(SOURCE).acquire()
         try:
             resp = client.app.bsky.feed.search_posts(
                 params={"q": f'"{ip.name_en}"', "limit": 100, "since": since}
@@ -57,5 +57,4 @@ def run(session: Session) -> int:
                 url=f"https://bsky.app/profile/{post.author.handle}/post/{rkey}",
                 lang=langs[0][:8] if langs else None,
             )
-        time.sleep(REQUEST_INTERVAL_S)
     return insert_documents(session, docs)

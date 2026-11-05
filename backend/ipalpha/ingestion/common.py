@@ -120,5 +120,10 @@ def insert_documents(session: Session, docs: Iterable[DocumentIn]) -> int:
     ]
     if not rows:
         return 0
-    stmt = insert(Document).values(rows).on_conflict_do_nothing(index_elements=["external_id"])
-    return session.execute(stmt).rowcount
+    stmt = (
+        insert(Document)
+        .values(rows)
+        .on_conflict_do_nothing(index_elements=["external_id"])
+        .returning(Document.id)
+    )
+    return len(session.execute(stmt).all())
