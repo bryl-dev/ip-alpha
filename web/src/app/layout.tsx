@@ -31,6 +31,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               IP-Alpha
             </Link>
             <span className="text-sm text-neutral-500">Fandom hype vs. equity</span>
+            <Link href="/chat" className="ml-auto text-sm text-neutral-300 hover:underline">
+              Ask the analyst
+            </Link>
           </div>
         </nav>
         <div className="flex-1">{children}</div>

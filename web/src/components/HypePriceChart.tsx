@@ -30,6 +30,7 @@ export default function HypePriceChart({
             yAxisId="hype"
             domain={[-4, 4]}
             tick={{ fill: "#a3a3a3", fontSize: 12 }}
+            tickFormatter={(v: number) => v.toFixed(1)}
             label={{ value: "Hype (z)", angle: -90, position: "insideLeft", fill: "#a3a3a3" }}
           />
           <YAxis

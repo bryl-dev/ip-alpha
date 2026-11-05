@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
 import HypePriceChart from "@/components/HypePriceChart";
-import { ApiError, getCompany, getCompanySeries } from "@/lib/api";
+import { ApiError, getCompany, getCompanySeries, getCompanyTheses, type Thesis } from "@/lib/api";
 import { fmtNumber, fmtPercent, fmtPrice, signClass } from "@/lib/format";
 
 export default function CompanyPage({ params }: PageProps<"/companies/[ticker]">) {
@@ -21,13 +21,19 @@ export default function CompanyPage({ params }: PageProps<"/companies/[ticker]">
 
 async function CompanyView({ params }: { params: Promise<{ ticker: string }> }) {
   const ticker = decodeURIComponent((await params).ticker);
-  let company, series;
+  let company, series, theses;
   try {
-    [company, series] = await Promise.all([getCompany(ticker), getCompanySeries(ticker)]);
+    [company, series, theses] = await Promise.all([
+      getCompany(ticker),
+      getCompanySeries(ticker),
+      getCompanyTheses(ticker),
+    ]);
   } catch (err) {
     if (err instanceof ApiError && err.status === 404) notFound();
     throw err;
   }
+  const shortName = company.name.replace(/,?\s+(Co\.,?\s*Ltd\.|Corporation|Holdings|Group)/g, "");
+  const question = `Why is ${shortName} moving, and does fan activity explain it?`;
 
   return (
     <>
@@ -35,6 +41,12 @@ async function CompanyView({ params }: { params: Promise<{ ticker: string }> }) 
         <h1 className="text-2xl font-semibold">{company.name}</h1>
         <span className="font-mono text-neutral-400">{company.ticker}</span>
         {company.name_ja && <span className="text-neutral-500">{company.name_ja}</span>}
+        <Link
+          href={`/chat?q=${encodeURIComponent(question)}`}
+          className="ml-auto text-sm text-sky-300 hover:underline"
+        >
+          Ask the analyst about {shortName} →
+        </Link>
       </header>
 
       <dl className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -60,6 +72,8 @@ async function CompanyView({ params }: { params: Promise<{ ticker: string }> }) 
           <p className="text-neutral-500">No data yet. Run ingestion and scoring first.</p>
         )}
       </section>
+
+      {theses[0] && <ThesisCard thesis={theses[0]} />}
 
       <section className="mt-8">
         <h2 className="text-sm font-medium text-neutral-300">Tracked IPs</h2>
@@ -96,6 +110,52 @@ async function CompanyView({ params }: { params: Promise<{ ticker: string }> }) 
         </table>
       </section>
     </>
+  );
+}
+
+const STANCE_LABEL: Record<Thesis["body"]["stance"], string> = {
+  hype_ahead_of_price: "Hype ahead of price",
+  price_ahead_of_hype: "Price ahead of hype",
+  no_clear_signal: "No clear signal",
+};
+
+function ThesisCard({ thesis }: { thesis: Thesis }) {
+  const { body } = thesis;
+  return (
+    <section className="mt-8 rounded-lg border border-neutral-800 p-4">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h2 className="text-sm font-medium text-neutral-300">Analyst thesis</h2>
+        <span className="text-xs text-neutral-500">
+          {thesis.date} · {STANCE_LABEL[body.stance]} · confidence {Math.round(body.confidence * 100)}%
+        </span>
+      </div>
+      <p className="mt-3 font-medium">{body.headline}</p>
+      <p className="mt-2 text-sm leading-relaxed text-neutral-300">{body.claim}</p>
+      {body.evidence.length > 0 && (
+        <ul className="mt-4 space-y-1.5 text-sm text-neutral-400">
+          {body.evidence.map((e) => (
+            <li key={e.document_id}>
+              {e.url ? (
+                <a href={e.url} target="_blank" rel="noreferrer" className="text-sky-300 hover:underline">
+                  {e.source}
+                </a>
+              ) : (
+                <span className="text-neutral-300">{e.source}</span>
+              )}{" "}
+              <span className="text-neutral-500">({e.published_at.slice(0, 10)})</span>: {e.point}
+            </li>
+          ))}
+        </ul>
+      )}
+      {body.risks.length > 0 && (
+        <p className="mt-4 text-sm text-neutral-400">
+          <span className="text-neutral-300">Risks:</span> {body.risks.join(" ")}
+        </p>
+      )}
+      <p className="mt-4 text-xs text-neutral-600">
+        {body.disclaimer} Model: {thesis.model}.
+      </p>
+    </section>
   );
 }
 
