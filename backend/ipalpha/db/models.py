@@ -129,6 +129,14 @@ class Document(Base):
     embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM))
     published_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), index=True)
 
+    # Filled by the normalization agent.
+    event_type: Mapped[str | None] = mapped_column(String(32))
+    summary: Mapped[str | None] = mapped_column(Text)
+    ip_mentions: Mapped[list[str] | None] = mapped_column(ARRAY(String))
+    normalized_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
+    # How the IP mapper resolved ip_id: alias, embedding, llm, unknown, or none (no mentions).
+    mapping: Mapped[str | None] = mapped_column(String(16))
+
 
 class StockPrice(Base):
     __tablename__ = "stock_prices"
@@ -174,5 +182,45 @@ class Thesis(Base):
     tokens: Mapped[int | None] = mapped_column(Integer)
     latency_ms: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class IpCandidate(Base):
+    """Titles the mapper saw but couldn't tie to a tracked IP; a human decides what to add."""
+
+    __tablename__ = "ip_candidates"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    key: Mapped[str] = mapped_column(String(200), unique=True)
+    name: Mapped[str] = mapped_column(String(200))
+    mention_count: Mapped[int] = mapped_column(Integer, default=1)
+    example_document_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("documents.id", ondelete="SET NULL")
+    )
+    status: Mapped[str] = mapped_column(String(16), default="pending")
+    first_seen: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    last_seen: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class DeadLetter(Base):
+    """An item a pipeline stage gave up on, kept for inspection instead of crashing the run."""
+
+    __tablename__ = "dead_letters"
+    __table_args__ = (UniqueConstraint("stage", "ref"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    stage: Mapped[str] = mapped_column(String(32))
+    ref: Mapped[str] = mapped_column(String(100))
+    error: Mapped[str] = mapped_column(Text)
+    attempts: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
