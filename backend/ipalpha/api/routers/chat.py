@@ -3,11 +3,12 @@ import logging
 from collections.abc import Iterator
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
 from ipalpha.agents.chat_graph import run_chat
 from ipalpha.api.schemas import ChatRequest
+from ipalpha.config import get_settings
 from ipalpha.db.session import session_scope
 from ipalpha.llm import LLM_UNAVAILABLE, get_llm
 
@@ -39,6 +40,8 @@ def _events(req: ChatRequest) -> Iterator[str]:
 @router.post("/chat")
 def chat(req: ChatRequest) -> StreamingResponse:
     """Server-sent events: status, sources, token (repeated), citations, done (or error)."""
+    if not get_settings().chat_enabled:
+        raise HTTPException(status_code=503, detail="Chat is disabled on this deployment.")
     return StreamingResponse(
         _events(req),
         media_type="text/event-stream",

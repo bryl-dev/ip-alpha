@@ -40,7 +40,11 @@ def run(session: Session, days: int | None = None) -> int:
     tickers.append(settings.benchmark_ticker)
     start = dt.date.today() - dt.timedelta(days=days or settings.price_history_days)
 
-    http = curl_requests.Session(impersonate="chrome", verify=ca_bundle_path())
+    # curl_cffi types `verify` as bool, but it accepts a CA bundle path at runtime.
+    http: curl_requests.Session[curl_requests.Response] = curl_requests.Session(
+        impersonate="chrome",
+        verify=ca_bundle_path(),  # type: ignore[arg-type]
+    )
     total = 0
     for ticker in tickers:
         try:
