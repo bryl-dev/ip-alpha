@@ -1,0 +1,75 @@
+# Production stack for a single Lightsail host. Run from this directory with
+#   docker compose --env-file .env.prod -f docker-compose.prod.yml up -d
+# (bootstrap.sh does this). Only Caddy publishes ports; Postgres and Redis stay internal.
+name: ip-alpha
+
+x-backend: &backend
+  image: ghcr.io/${GHCR_OWNER:?set GHCR_OWNER in .env.prod}/ip-alpha-api:${IMAGE_TAG:-latest}
+  restart: unless-stopped
+  env_file: [.env.prod]
+  environment:
+    DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-ipalpha}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.prod}@db:5432/${POSTGRES_DB:-ipalpha}
+    REDIS_URL: redis://redis:6379/0
+    LOG_JSON: "true"
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ipalpha}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.prod}
+      POSTGRES_DB: ${POSTGRES_DB:-ipalpha}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ipalpha}"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: [redisdata:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+  api:
+    <<: *backend
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn ipalpha.api.main:app --host 0.0.0.0 --port 8000
+             --proxy-headers --forwarded-allow-ips='*'"
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+
+  worker:
+    <<: *backend
+    command: ipalpha worker
+    # The image's HEALTHCHECK probes the API's HTTP port, which the worker doesn't serve.
+    healthcheck:
+      disable: true
+    depends_on:
+      api: {condition: service_started}
+      redis: {condition: service_healthy}
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in .env.prod}
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [api]
+
+volumes:
+  pgdata:
+  redisdata:
+  caddy_data:
+  caddy_config:
