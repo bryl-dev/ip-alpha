@@ -18,17 +18,17 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ipalpha.agents import tools
+from ipalpha.agents.citations import _mentions, audit_citations, company_terms
 from ipalpha.db.models import Company
 from ipalpha.ingestion.common import utcnow
 from ipalpha.ingestion.matching import IpMatcher
 from ipalpha.llm import LLM, Message, StructuredOutputError
+from ipalpha.llm_events import llm_context
 
 log = logging.getLogger(__name__)
 
 MAX_SOURCES = 8
 HISTORY_TURNS = 6
-_EN_SUFFIX = re.compile(r",?\s+(Co\.,?\s*Ltd\.|Corporation|Holdings|Group|Inc\.)", re.IGNORECASE)
-_JA_SUFFIX = re.compile(r"(グループ|ホールディングス)$")
 _CITATION = re.compile(r"\[(\d+(?:\s*[,\-–]\s*\d+)*)\]")
 _MAX_RANGE = 20
 
@@ -62,21 +62,6 @@ class ChatContext:
 
 class TickerPick(BaseModel):
     tickers: list[str]
-
-
-def company_terms(company: Company) -> set[str]:
-    terms = {company.name, _EN_SUFFIX.sub("", company.name).strip(), company.ticker}
-    terms.add(company.ticker.split(".")[0])
-    if company.name_ja:
-        terms |= {company.name_ja, _JA_SUFFIX.sub("", company.name_ja)}
-    return {t for t in terms if t}
-
-
-def _mentions(text: str, term: str) -> bool:
-    if not term.isascii():
-        return term in text
-    pattern = rf"(?<![A-Za-z0-9]){re.escape(term)}(?![A-Za-z0-9])"
-    return re.search(pattern, text, re.IGNORECASE) is not None
 
 
 def find_companies(text: str, companies: list[Company], ip_matcher: IpMatcher) -> list[str]:
@@ -116,6 +101,11 @@ def cited_ids(answer: str) -> list[int]:
 
 
 def _understand(state: ChatState, runtime: Runtime[ChatContext]) -> dict[str, Any]:
+    with llm_context("chat:understand"):
+        return _understand_inner(state, runtime)
+
+
+def _understand_inner(state: ChatState, runtime: Runtime[ChatContext]) -> dict[str, Any]:
     ctx, write = runtime.context, get_stream_writer()
     companies = tools.companies_with_ownerships(ctx.session)
     matcher = IpMatcher.from_db(ctx.session)
@@ -151,6 +141,11 @@ def _pick_with_llm(llm: LLM, question: str, companies: list[Company]) -> list[st
 
 
 def _retrieve(state: ChatState, runtime: Runtime[ChatContext]) -> dict[str, Any]:
+    with llm_context("chat:retrieve"):
+        return _retrieve_inner(state, runtime)
+
+
+def _retrieve_inner(state: ChatState, runtime: Runtime[ChatContext]) -> dict[str, Any]:
     ctx, write = runtime.context, get_stream_writer()
     companies = {c.ticker: c for c in tools.companies_with_ownerships(ctx.session)}
     chosen = [companies[t] for t in state["tickers"]] or list(companies.values())
@@ -206,24 +201,37 @@ def build_messages(state: ChatState) -> list[Message]:
 
 
 def _answer(state: ChatState, runtime: Runtime[ChatContext]) -> dict[str, Any]:
-    write = get_stream_writer()
-    parts = []
-    for token in runtime.context.llm.stream(build_messages(state)):
-        parts.append(token)
-        write({"type": "token", "text": token})
-    return {"answer": "".join(parts)}
+    with llm_context("chat:answer"):
+        write = get_stream_writer()
+        parts = []
+        for token in runtime.context.llm.stream(build_messages(state)):
+            parts.append(token)
+            write({"type": "token", "text": token})
+        return {"answer": "".join(parts)}
 
 
-def _verify(state: ChatState) -> dict[str, Any]:
-    known = {s.id for s in state["sources"]}
-    cited = cited_ids(state["answer"])
-    invalid = [i for i in cited if i not in known]
-    if invalid:
-        log.warning("chat answer cited unknown documents %s", invalid)
-    get_stream_writer()(
-        {"type": "citations", "valid": [i for i in cited if i in known], "invalid": invalid}
-    )
-    return {}
+def _verify(state: ChatState, runtime: Runtime[ChatContext]) -> dict[str, Any]:
+    with llm_context("chat:verify"):
+        shown = {s.id for s in state["sources"]}
+        cited = cited_ids(state["answer"])
+        audit = audit_citations(runtime.context.session, cited, shown, state.get("tickers") or [])
+        invalid = audit.unknown + audit.missing
+        if invalid or audit.unrelated:
+            log.warning(
+                "chat answer citations unknown=%s missing=%s unrelated=%s",
+                audit.unknown,
+                audit.missing,
+                audit.unrelated,
+            )
+        get_stream_writer()(
+            {
+                "type": "citations",
+                "valid": audit.valid,
+                "invalid": invalid,
+                "unrelated": audit.unrelated,
+            }
+        )
+        return {}
 
 
 def build_graph():
