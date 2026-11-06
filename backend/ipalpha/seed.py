@@ -62,15 +62,19 @@ def apply_seeds(session: Session, seeds_dir: Path) -> tuple[int, int]:
     session.flush()
 
     by_slug: dict[str, Ip] = {i.slug: i for i in session.scalars(select(Ip)).all()}
-    for seed in ips:
-        ip = by_slug.get(seed.slug) or Ip(slug=seed.slug)
-        ip.name_en, ip.name_ja, ip.aliases = seed.name_en, seed.name_ja, seed.aliases
-        ip.type, ip.steam_appid, ip.mal_id = seed.type.value, seed.steam_appid, seed.mal_id
+    for ip_seed in ips:
+        ip = by_slug.get(ip_seed.slug) or Ip(slug=ip_seed.slug)
+        ip.name_en, ip.name_ja, ip.aliases = ip_seed.name_en, ip_seed.name_ja, ip_seed.aliases
+        ip.type, ip.steam_appid, ip.mal_id = (
+            ip_seed.type.value,
+            ip_seed.steam_appid,
+            ip_seed.mal_id,
+        )
         existing = {(o.company.ticker, o.role): o for o in ip.ownerships}
-        wanted = {(o.ticker, o.role.value): o for o in seed.owners}
-        for key, row in existing.items():
+        wanted = {(o.ticker, o.role.value): o for o in ip_seed.owners}
+        for key, stale in existing.items():
             if key not in wanted:
-                ip.ownerships.remove(row)
+                ip.ownerships.remove(stale)
         for (ticker, role), owner in wanted.items():
             row = existing.get((ticker, role))
             if row is None:

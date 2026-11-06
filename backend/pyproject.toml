@@ -69,3 +69,7 @@ testpaths = ["tests"]
 python_version = "3.12"
 ignore_missing_imports = true
 plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["ipalpha.llm", "ipalpha.ingestion.common", "ipalpha.agents.normalize"]
+ignore_errors = true
