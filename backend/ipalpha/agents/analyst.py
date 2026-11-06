@@ -10,6 +10,8 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from ipalpha.agents import tools
+from ipalpha.agents.citations import audit_citations
+from ipalpha.agents.common import dead_letter
 from ipalpha.config import Settings
 from ipalpha.db.models import Company, HypeScore, Thesis
 from ipalpha.ingestion.common import JST
@@ -100,15 +102,27 @@ def write_thesis(
         result = llm.structured(build_messages(snap, docs), ThesisDraft)
     except StructuredOutputError as exc:
         log.warning("thesis for %s failed validation: %s", company.ticker, exc)
+        dead_letter(session, "analyze", f"thesis:{company.ticker}:{hype_row.date}", str(exc))
+        session.commit()
         return None
 
-    evidence, invalid = check_citations(result.value, docs)
-    if invalid:
-        log.warning("thesis for %s cited unknown documents %s", company.ticker, invalid)
+    evidence, _ = check_citations(result.value, docs)
+    audit = audit_citations(
+        session,
+        [ev.document_id for ev in result.value.evidence],
+        [d.id for d in docs],
+        [company.ticker],
+    )
+    valid_ids = set(audit.valid)
+    evidence = [row for row in evidence if row["document_id"] in valid_ids]
+    dropped = audit.unknown + audit.missing + audit.unrelated
+    if dropped:
+        log.warning("thesis for %s dropped citations %s", company.ticker, dropped)
     body = result.value.model_dump()
     body.update(
         evidence=evidence,
-        dropped_citations=invalid,
+        dropped_citations=dropped,
+        citation_audit=audit.model_dump(),
         disclaimer=DISCLAIMER,
         inputs={
             "hype": snap.hype,

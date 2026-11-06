@@ -15,6 +15,7 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
+from ipalpha.agents.common import dead_letter
 from ipalpha.config import Settings
 from ipalpha.db.models import Document, Ip, IpCandidate
 from ipalpha.ingestion.matching import IpMatcher, IpRef
@@ -86,7 +87,12 @@ def triage(
 
 
 def disambiguate(
-    llm: LLM, mention: str, context: str, shortlist: list[Candidate], labels: dict[int, str]
+    llm: LLM,
+    mention: str,
+    context: str,
+    shortlist: list[Candidate],
+    labels: dict[int, str],
+    session: Session | None = None,
 ) -> IpRef | None:
     options = "\n".join(f"{i}. {labels[c.ip.id]}" for i, c in enumerate(shortlist, 1))
     messages = [
@@ -108,6 +114,8 @@ def disambiguate(
         choice = llm.structured(messages, Disambiguation).value.choice
     except StructuredOutputError as exc:
         log.warning("disambiguation failed for %r: %s", mention, exc)
+        if session is not None:
+            dead_letter(session, "map_ip", f"mention:{_candidate_key(mention)}", str(exc))
         return None
     return shortlist[choice - 1].ip if 1 <= choice <= len(shortlist) else None
 
@@ -187,7 +195,7 @@ def run(session: Session, llm: LLM, settings: Settings) -> dict[str, int]:
             if verdict == "accept":
                 decided[key] = (shortlist[0].ip, "embedding")
             elif verdict == "ask":
-                ip = disambiguate(llm, mention, context, shortlist, labels)
+                ip = disambiguate(llm, mention, context, shortlist, labels, session)
                 decided[key] = (ip, "llm") if ip else None
             else:
                 decided[key] = None
