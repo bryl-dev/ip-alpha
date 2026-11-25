@@ -9,11 +9,13 @@ times of day). A failing stage is logged and recorded in `errors`, and the graph
 
 import logging
 import operator
+import time
 from collections.abc import Callable, Sequence
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from typing import Annotated, Any, TypedDict
 
+import structlog
 from langgraph.graph import END, START, StateGraph
 from langgraph.runtime import Runtime
 from sqlalchemy.orm import Session
@@ -22,9 +24,11 @@ from ipalpha.agents import analyst, embed, mapper, normalize
 from ipalpha.config import Settings, get_settings
 from ipalpha.db.session import session_scope
 from ipalpha.llm import LLM, LLM_UNAVAILABLE, get_llm
+from ipalpha.llm_events import llm_context
 from ipalpha.scoring import job as scoring_job
 
 log = logging.getLogger(__name__)
+plog = structlog.get_logger("pipeline")
 
 STAGES = ("fetch", "normalize", "map_ip", "embed", "score", "analyze")
 ENRICH_STAGES = ("normalize", "map_ip", "embed")
@@ -81,17 +85,37 @@ def _node(name: str) -> Callable[[PipelineState, Runtime[PipelineContext]], dict
         if name not in state["stages"]:
             return {}
         ctx = runtime.context
-        try:
-            result = WORK[name](ctx)
-        except LLM_UNAVAILABLE as exc:
-            msg = f"{name}: language model unreachable at {ctx.llm.base_url} ({exc})"
-            log.error(msg)
-            return {"errors": [msg]}
-        except Exception as exc:
-            log.exception("pipeline stage %s failed", name)
-            return {"errors": [f"{name}: {exc}"]}
-        log.info("pipeline stage %s: %s", name, result)
-        return {"results": {name: result}}
+        start = time.perf_counter()
+        with llm_context(name):
+            try:
+                result = WORK[name](ctx)
+            except LLM_UNAVAILABLE as exc:
+                msg = f"{name}: language model unreachable at {ctx.llm.base_url} ({exc})"
+                log.error(msg)
+                plog.info(
+                    "pipeline.stage",
+                    stage=name,
+                    status="llm_unavailable",
+                    duration_ms=int((time.perf_counter() - start) * 1000),
+                )
+                return {"errors": [msg]}
+            except Exception as exc:
+                log.exception("pipeline stage %s failed", name)
+                plog.info(
+                    "pipeline.stage",
+                    stage=name,
+                    status="error",
+                    duration_ms=int((time.perf_counter() - start) * 1000),
+                )
+                return {"errors": [f"{name}: {exc}"]}
+            log.info("pipeline stage %s: %s", name, result)
+            plog.info(
+                "pipeline.stage",
+                stage=name,
+                status="ok",
+                duration_ms=int((time.perf_counter() - start) * 1000),
+            )
+            return {"results": {name: result}}
 
     return node
 
